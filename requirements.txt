@@ -1,0 +1,48 @@
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.30.0
+accelerate>=0.20.0
+bitsandbytes>=0.39.0
+
+# Vision models
+opencv-python>=4.8.0
+Pillow>=9.5.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+
+# OCR and text extraction
+pytesseract>=0.3.10
+easyocr>=1.7.0
+paddleocr>=2.7.0
+
+# Barcode detection and decoding
+pyzbar>=0.1.9
+opencv-contrib-python>=4.8.0
+
+# YOLOv9
+ultralytics>=8.0.0
+
+# MobileSAM
+segment-anything>=1.0
+
+# LLaVA-1.5
+llava>=1.0.0
+
+# MiniGPT-4
+minigpt4>=1.0.0
+
+# Qwen-VL
+qwen-vl-utils>=1.0.0
+
+# CogVLM
+cogvlm>=1.0.0
+
+# Utilities
+tqdm>=4.65.0
+requests>=2.31.0
+omegaconf>=2.3.0
+einops>=0.6.0
+
+# Optional GPU acceleration
+# CUDA toolkit should be installed separately
