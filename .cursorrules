@@ -1,0 +1,29 @@
+# Cursor Rules for Vision Models Project
+
+## Context7 MCP Integration
+Always use context7 when I need code generation, setup or configuration steps, or
+library/API documentation. This means you should automatically use the Context7 MCP
+tools to resolve library id and get library docs without me having to explicitly ask.
+
+## Project Context
+This is a comprehensive test suite for 7 vision models, designed for package analysis, 
+text extraction, and barcode detection. All models run as Docker containers for 
+consistent deployment across Mac, Azure, and AWS.
+
+## Key Models
+- zxing-cpp: Barcode detection and decoding
+- PaddleOCR: Text extraction and OCR
+- YOLOv9: Object detection
+- MobileSAM: Image segmentation
+- LLaVA-1.5: Vision-language model
+- MiniGPT-4: Vision-language model
+- CogVLM: Vision-language model
+- Qwen-VL: Vision-language model
+- Mobile-tuned LLaVA: Mobile-optimized vision-language model
+
+## Development Guidelines
+- All models should be containerized with Docker
+- Use consistent API patterns across all models
+- Maintain comprehensive test coverage
+- Document performance metrics and results
+- Follow Python best practices for the main codebase

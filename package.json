@@ -1,0 +1,16 @@
+{
+  "name": "test-7-vision-models",
+  "version": "1.0.0",
+  "description": "A comprehensive test suite for 14 vision models, designed for package analysis, text extraction, and barcode detection. All models run as Docker containers for consistent deployment across Mac, Azure, and AWS.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
