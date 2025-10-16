@@ -44,7 +44,7 @@ RUN git clone --depth 1 https://github.com/nu-book/zxing-cpp.git /tmp/zxing-cpp 
 WORKDIR /app
 
 # Copy model files
-COPY model.py .
+COPY model_parallel_pattern.py .
 COPY api_server.py .
 COPY requirements.txt .
 
