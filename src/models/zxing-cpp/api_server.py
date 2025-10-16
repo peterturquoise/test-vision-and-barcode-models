@@ -16,7 +16,7 @@ from pathlib import Path
 # Add current directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from model_correct import ZXingCPPModel
+from model_parallel_pattern import ZXingCPPModel
 
 app = FastAPI(title="ZXing-CPP API", version="1.0.0")
 
@@ -48,6 +48,7 @@ async def root():
         "model_type": "barcode-only",
         "endpoints": {
             "detect_barcodes": "/detect_barcodes",
+            "detect_barcodes_with_pattern": "/detect_barcodes?pattern=3232",
             "detect_barcode_pattern": "/detect_barcode_pattern?pattern=3232",
             "health": "/health"
         }
@@ -63,26 +64,34 @@ async def health_check():
     }
 
 @app.post("/detect_barcodes")
-async def detect_barcodes(file: UploadFile = File(...)):
-    """Detect barcodes in image using correct ZXingReader parsing"""
+async def detect_barcodes(file: UploadFile = File(...), pattern: str = Query(None, description="Optional barcode pattern to search for (e.g., '3232' for BPost)")):
+    """Detect barcodes in image using parallel preprocessing with optional pattern matching"""
     try:
         # Read and process image
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data))
         
-        # Detect barcodes using correct parsing
+        # Detect barcodes using parallel preprocessing
         start_time = time.time()
-        barcode_results = model.detect_barcodes(image)
+        barcode_results = model.detect_barcodes(image, pattern)
         processing_time = time.time() - start_time
+        
+        # Determine if pattern was found
+        pattern_found = False
+        if pattern and barcode_results:
+            pattern_found = any(barcode["value"].startswith(pattern) for barcode in barcode_results)
         
         return {
             "success": True,
             "model": "ZXing-CPP",
-            "model_type": "barcode-only",
+            "model_type": "barcode-detection",
+            "pattern": pattern,
+            "pattern_found": pattern_found,
             "barcode_results": barcode_results,
             "processing_time": processing_time,
             "image_size": image.size,
-            "image_format": image.format
+            "image_format": image.format,
+            "message": f"Pattern '{pattern}' found" if pattern_found else f"Pattern '{pattern}' not found" if pattern else "All barcodes detected"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error detecting barcodes: {str(e)}")
