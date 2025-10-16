@@ -16,7 +16,7 @@ from pathlib import Path
 # Add current directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from model import ZXingCPPModel
+from model_correct import ZXingCPPModel
 
 app = FastAPI(title="ZXing-CPP API", version="1.0.0")
 
@@ -64,76 +64,22 @@ async def health_check():
 
 @app.post("/detect_barcodes")
 async def detect_barcodes(file: UploadFile = File(...)):
-    """Detect barcodes in image"""
+    """Detect barcodes in image using correct ZXingReader parsing"""
     try:
         # Read and process image
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data))
         
-        # Detect barcodes
+        # Detect barcodes using correct parsing
         start_time = time.time()
         barcode_results = model.detect_barcodes(image)
         processing_time = time.time() - start_time
-        
-        # Extract actual barcode values from ZXingReader output
-        actual_barcodes = []
-        seen_barcodes = set()  # To avoid duplicates
-        
-        for det in barcode_results:
-            value = det.value
-            
-            # Parse different types of ZXingReader output lines
-            if value.startswith('Text:'):
-                # Extract the quoted text: "323201167200000687647030"
-                match = re.search(r'"([^"]+)"', value)
-                if match:
-                    barcode_text = match.group(1)
-                    # Store this barcode text for later processing
-                    if barcode_text not in seen_barcodes:
-                        seen_barcodes.add(barcode_text)
-                        actual_barcodes.append({
-                            "value": barcode_text,
-                            "barcode_type": "UNKNOWN",  # Will be updated from Format line
-                            "confidence": 0.95,
-                            "bbox": [0, 0, 0, 0],  # Will be updated from Position line
-                            "rotation": 0
-                        })
-            
-            elif value.startswith('Format:'):
-                # Extract format: "DataMatrix", "Code39", etc.
-                format_match = re.search(r'Format:\s+(\w+)', value)
-                if format_match and actual_barcodes:
-                    actual_barcodes[-1]["barcode_type"] = format_match.group(1)
-            
-            elif value.startswith('Position:'):
-                # Extract position: "1054x986 856x986 854x1010 1052x1010"
-                pos_match = re.search(r'Position:\s+(\d+)x(\d+)\s+(\d+)x(\d+)\s+(\d+)x(\d+)\s+(\d+)x(\d+)', value)
-                if pos_match and actual_barcodes:
-                    # Convert to [x1, y1, x2, y2] format
-                    x1, y1 = int(pos_match.group(1)), int(pos_match.group(2))
-                    x2, y2 = int(pos_match.group(3)), int(pos_match.group(4))
-                    x3, y3 = int(pos_match.group(5)), int(pos_match.group(6))
-                    x4, y4 = int(pos_match.group(7)), int(pos_match.group(8))
-                    
-                    # Calculate bounding box (min/max coordinates)
-                    min_x = min(x1, x2, x3, x4)
-                    max_x = max(x1, x2, x3, x4)
-                    min_y = min(y1, y2, y3, y4)
-                    max_y = max(y1, y2, y3, y4)
-                    
-                    actual_barcodes[-1]["bbox"] = [min_x, min_y, max_x, max_y]
-            
-            elif value.startswith('Rotation:'):
-                # Extract rotation: "180 deg"
-                rot_match = re.search(r'Rotation:\s+(\d+)\s+deg', value)
-                if rot_match and actual_barcodes:
-                    actual_barcodes[-1]["rotation"] = int(rot_match.group(1))
         
         return {
             "success": True,
             "model": "ZXing-CPP",
             "model_type": "barcode-only",
-            "barcode_results": actual_barcodes,
+            "barcode_results": barcode_results,
             "processing_time": processing_time,
             "image_size": image.size,
             "image_format": image.format
@@ -152,68 +98,14 @@ async def detect_barcode_pattern(file: UploadFile = File(...), pattern: str = Qu
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data))
         
-        # Detect barcodes
+        # Detect barcodes using correct parsing
         start_time = time.time()
         barcode_results = model.detect_barcodes(image)
         processing_time = time.time() - start_time
         
-        # Extract actual barcode values from ZXingReader output
-        actual_barcodes = []
-        seen_barcodes = set()  # To avoid duplicates
-        
-        for det in barcode_results:
-            value = det.value
-            
-            # Parse different types of ZXingReader output lines
-            if value.startswith('Text:'):
-                # Extract the quoted text: "323201167200000687647030"
-                match = re.search(r'"([^"]+)"', value)
-                if match:
-                    barcode_text = match.group(1)
-                    # Store this barcode text for later processing
-                    if barcode_text not in seen_barcodes:
-                        seen_barcodes.add(barcode_text)
-                        actual_barcodes.append({
-                            "value": barcode_text,
-                            "barcode_type": "UNKNOWN",  # Will be updated from Format line
-                            "confidence": 0.95,
-                            "bbox": [0, 0, 0, 0],  # Will be updated from Position line
-                            "rotation": 0
-                        })
-            
-            elif value.startswith('Format:'):
-                # Extract format: "DataMatrix", "Code39", etc.
-                format_match = re.search(r'Format:\s+(\w+)', value)
-                if format_match and actual_barcodes:
-                    actual_barcodes[-1]["barcode_type"] = format_match.group(1)
-            
-            elif value.startswith('Position:'):
-                # Extract position: "1054x986 856x986 854x1010 1052x1010"
-                pos_match = re.search(r'Position:\s+(\d+)x(\d+)\s+(\d+)x(\d+)\s+(\d+)x(\d+)\s+(\d+)x(\d+)', value)
-                if pos_match and actual_barcodes:
-                    # Convert to [x1, y1, x2, y2] format
-                    x1, y1 = int(pos_match.group(1)), int(pos_match.group(2))
-                    x2, y2 = int(pos_match.group(3)), int(pos_match.group(4))
-                    x3, y3 = int(pos_match.group(5)), int(pos_match.group(6))
-                    x4, y4 = int(pos_match.group(7)), int(pos_match.group(8))
-                    
-                    # Calculate bounding box (min/max coordinates)
-                    min_x = min(x1, x2, x3, x4)
-                    max_x = max(x1, x2, x3, x4)
-                    min_y = min(y1, y2, y3, y4)
-                    max_y = max(y1, y2, y3, y4)
-                    
-                    actual_barcodes[-1]["bbox"] = [min_x, min_y, max_x, max_y]
-            
-            elif value.startswith('Rotation:'):
-                # Extract rotation: "180 deg"
-                rot_match = re.search(r'Rotation:\s+(\d+)\s+deg', value)
-                if rot_match and actual_barcodes:
-                    actual_barcodes[-1]["rotation"] = int(rot_match.group(1))
-        
         # Look for pattern match first
         matching_barcodes = []
-        for barcode in actual_barcodes:
+        for barcode in barcode_results:
             if barcode["value"].startswith(pattern):
                 matching_barcodes.append(barcode)
         
@@ -227,7 +119,7 @@ async def detect_barcode_pattern(file: UploadFile = File(...), pattern: str = Qu
                 "pattern": pattern,
                 "pattern_found": True,
                 "barcode_results": [matching_barcodes[0]],  # Return only first match
-                "total_barcodes_found": len(actual_barcodes),
+                "total_barcodes_found": len(barcode_results),
                 "processing_time": processing_time,
                 "image_size": image.size,
                 "image_format": image.format,
@@ -241,8 +133,8 @@ async def detect_barcode_pattern(file: UploadFile = File(...), pattern: str = Qu
                 "model_type": "barcode-scanner",
                 "pattern": pattern,
                 "pattern_found": False,
-                "barcode_results": actual_barcodes,
-                "total_barcodes_found": len(actual_barcodes),
+                "barcode_results": barcode_results,
+                "total_barcodes_found": len(barcode_results),
                 "processing_time": processing_time,
                 "image_size": image.size,
                 "image_format": image.format,
