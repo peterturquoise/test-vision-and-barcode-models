@@ -104,3 +104,4 @@ if __name__ == "__main__":
     print("2. Update .cursor/mcp.json with your API key")
     print("3. Restart Cursor")
     print("4. Test with questions about zxing-cpp or other libraries")
+

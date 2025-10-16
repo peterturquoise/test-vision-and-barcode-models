@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-ZXing-CPP Model with Parallel Pattern Detection
+ZXing-CPP Model with Parallel Preprocessing Approaches
 Uses multiprocessing to run preprocessing approaches in parallel
-Returns immediately when pattern match is found
 """
 
 import subprocess
@@ -15,7 +14,7 @@ import numpy as np
 from PIL import Image
 import cv2
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional
+from typing import List, Dict
 import threading
 
 class ZXingCPPModel:
@@ -23,48 +22,59 @@ class ZXingCPPModel:
         self.logger = logging.getLogger(__name__)
         self.zxing_path = "/usr/local/bin/ZXingReader"
         
-        # Define preprocessing approaches (ordered by success rate from our test)
+        # Define preprocessing approaches
         self.approaches = [
-            "Higher Contrast",      # Found 3232 barcode
-            "Scale 1.5x",          # Found ITF barcode  
-            "Scale 2.0x",          # Found ITF barcode
-            "CLAHE Enhancement",   # Found ITF barcode
-            "Original",             # Found basic barcode
-            "Grayscale",           # Found basic barcode
-            "Threshold Binary",    # Found nothing
+            "Original",
+            "Grayscale", 
+            "Higher Contrast",
+            "Scale 1.5x",
+            "Scale 2.0x",
+            "Threshold Binary",
+            "Threshold Adaptive",
+            "Morphological Opening",
+            "Gaussian Blur",
+            "Sharpening"
         ]
         
         # Thread lock for logging
         self.log_lock = threading.Lock()
         
-    def detect_barcodes(self, image, pattern: Optional[str] = None):
+    def detect_barcodes(self, image):
         """
         Detect barcodes using parallel preprocessing approaches
-        If pattern is provided, returns immediately when pattern match is found
+        Returns list of barcode dictionaries with proper parsing
         """
         try:
             # Convert PIL Image to BGR NumPy array (OpenCV format)
             if isinstance(image, Image.Image):
+                # Convert PIL to numpy array
                 img_array = np.array(image)
+                # Convert RGB to BGR for OpenCV
                 if len(img_array.shape) == 3:
                     img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
             else:
                 img_array = image
             
-            if pattern:
-                self.logger.info(f"🔍 Pattern detection mode: Looking for pattern '{pattern}'")
-                return self._detect_with_pattern(img_array, pattern)
-            else:
-                self.logger.info(f"🔍 Full detection mode: Finding all barcodes")
-                return self._detect_all_barcodes(img_array)
+            self.logger.info(f"🔍 Starting parallel barcode detection with {len(self.approaches)} approaches")
+            
+            # Run approaches in parallel
+            start_time = time.time()
+            all_barcodes = self._run_parallel_approaches(img_array)
+            total_time = time.time() - start_time
+            
+            # Deduplicate results
+            unique_barcodes = self._deduplicate_barcodes(all_barcodes)
+            
+            self.logger.info(f"🔍 Found {len(unique_barcodes)} unique barcodes in {total_time:.3f}s using parallel processing")
+            return unique_barcodes
             
         except Exception as e:
             self.logger.error(f"❌ Error in detect_barcodes: {e}")
             return []
     
-    def _detect_with_pattern(self, image: np.ndarray, pattern: str) -> List[Dict]:
-        """Detect barcodes with pattern matching - returns immediately when pattern found"""
-        start_time = time.time()
+    def _run_parallel_approaches(self, image: np.ndarray) -> List[Dict]:
+        """Run all preprocessing approaches in parallel"""
+        all_barcodes = []
         
         with ThreadPoolExecutor(max_workers=4) as executor:
             # Submit all approaches
@@ -74,53 +84,6 @@ class ZXingCPPModel:
             }
             
             # Collect results as they complete
-            for future in as_completed(future_to_approach):
-                approach = future_to_approach[future]
-                try:
-                    barcodes = future.result()
-                    
-                    # Check for pattern match
-                    for barcode in barcodes:
-                        if barcode['value'].startswith(pattern):
-                            processing_time = time.time() - start_time
-                            with self.log_lock:
-                                self.logger.info(f"🎯 PATTERN FOUND! '{pattern}' in {approach} after {processing_time:.3f}s")
-                                self.logger.info(f"🚀 Early return: {barcode['value']} ({barcode['barcode_type']})")
-                            
-                            # Cancel remaining futures
-                            for f in future_to_approach:
-                                f.cancel()
-                            
-                            return [barcode]  # Return immediately
-                    
-                    with self.log_lock:
-                        if barcodes:
-                            self.logger.info(f"✅ {approach}: Found {len(barcodes)} barcodes (no pattern match)")
-                        else:
-                            self.logger.info(f"❌ {approach}: No barcodes found")
-                            
-                except Exception as e:
-                    with self.log_lock:
-                        self.logger.error(f"❌ {approach}: Error - {e}")
-        
-        # No pattern found - return empty
-        processing_time = time.time() - start_time
-        self.logger.info(f"❌ Pattern '{pattern}' not found after {processing_time:.3f}s")
-        return []
-    
-    def _detect_all_barcodes(self, image: np.ndarray) -> List[Dict]:
-        """Detect all barcodes using parallel preprocessing approaches"""
-        start_time = time.time()
-        
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            # Submit all approaches
-            future_to_approach = {
-                executor.submit(self._detect_with_approach, image, approach): approach 
-                for approach in self.approaches
-            }
-            
-            # Collect all results
-            all_barcodes = []
             for future in as_completed(future_to_approach):
                 approach = future_to_approach[future]
                 try:
@@ -136,12 +99,7 @@ class ZXingCPPModel:
                     with self.log_lock:
                         self.logger.error(f"❌ {approach}: Error - {e}")
         
-        # Deduplicate results
-        unique_barcodes = self._deduplicate_barcodes(all_barcodes)
-        processing_time = time.time() - start_time
-        
-        self.logger.info(f"🔍 Found {len(unique_barcodes)} unique barcodes in {processing_time:.3f}s")
-        return unique_barcodes
+        return all_barcodes
     
     def _detect_with_approach(self, image: np.ndarray, approach: str) -> List[Dict]:
         """Detect barcodes using a specific preprocessing approach"""
@@ -185,7 +143,12 @@ class ZXingCPPModel:
                 return image
                 
             elif approach == "Higher Contrast":
-                return cv2.convertScaleAbs(image, alpha=1.5, beta=0)
+                if len(image.shape) == 3:
+                    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                else:
+                    gray = image
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                return clahe.apply(gray)
                 
             elif approach == "Scale 1.5x":
                 height, width = image.shape[:2]
@@ -207,13 +170,27 @@ class ZXingCPPModel:
                 _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
                 return binary
                 
-            elif approach == "CLAHE Enhancement":
+            elif approach == "Threshold Adaptive":
                 if len(image.shape) == 3:
                     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                 else:
                     gray = image
-                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                return clahe.apply(gray)
+                return cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                
+            elif approach == "Morphological Opening":
+                if len(image.shape) == 3:
+                    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                else:
+                    gray = image
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                return cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel)
+                
+            elif approach == "Gaussian Blur":
+                return cv2.GaussianBlur(image, (5, 5), 0)
+                
+            elif approach == "Sharpening":
+                kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+                return cv2.filter2D(image, -1, kernel)
                 
             else:
                 return image
@@ -309,10 +286,6 @@ class ZXingCPPModel:
         for barcode in all_barcodes:
             value = barcode['value']
             
-            # Skip obviously corrupted barcodes
-            if self._is_corrupted_barcode(value):
-                continue
-            
             if value not in unique_barcodes:
                 # First occurrence
                 unique_barcodes[value] = barcode
@@ -328,28 +301,3 @@ class ZXingCPPModel:
                     unique_barcodes[value] = barcode
         
         return list(unique_barcodes.values())
-    
-    def _is_corrupted_barcode(self, value: str) -> bool:
-        """Check if a barcode value appears to be corrupted"""
-        # Skip barcodes with obvious corruption indicators
-        corruption_indicators = [
-            '®', 'Ì', 'N', '.', 'z', 'y', 'P',  # Special characters that shouldn't be in barcodes
-            'hvtpw://', 'ww�', 'tezen�s',  # Corrupted URLs
-            '2QBB004763892321449',  # Suspiciously long MicroQRCode
-            'NG',  # Too short to be meaningful
-        ]
-        
-        for indicator in corruption_indicators:
-            if indicator in value:
-                return True
-        
-        # Skip barcodes that are too short (less than 3 characters)
-        if len(value) < 3:
-            return True
-            
-        # Skip barcodes that are mostly non-alphanumeric
-        alphanumeric_count = sum(1 for c in value if c.isalnum())
-        if len(value) > 0 and alphanumeric_count / len(value) < 0.7:
-            return True
-        
-        return False

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Test</title>
+</head>
+<body>
+    <h1>ZXing WASM Test</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/iife/full/index.js"></script>
+    <script>
+        async function testWASM() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            try {
+                status.textContent = 'Initializing WASM...';
+                console.log('ZXingWASM object:', ZXingWASM);
+                
+                // Test if ZXingWASM is available
+                if (typeof ZXingWASM === 'undefined') {
+                    throw new Error('ZXingWASM is not defined');
+                }
+                
+                status.textContent = 'Preparing module...';
+                const module = await ZXingWASM.prepareZXingModule({
+                    overrides: {
+                        locateFile: (path, prefix) => {
+                            if (path.endsWith('.wasm')) {
+                                return `https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/full/${path}`;
+                            }
+                            return prefix + path;
+                        }
+                    }
+                });
+                
+                status.textContent = 'WASM loaded successfully!';
+                results.innerHTML = '<p style="color: green;">✅ WASM module loaded successfully!</p>';
+                
+                // Test reading barcodes
+                console.log('Testing readBarcodes function...');
+                if (typeof ZXingWASM.readBarcodes === 'function') {
+                    results.innerHTML += '<p style="color: green;">✅ readBarcodes function available</p>';
+                } else {
+                    results.innerHTML += '<p style="color: red;">❌ readBarcodes function not available</p>';
+                }
+                
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                results.innerHTML = '<p style="color: red;">❌ Error: ' + error.message + '</p>';
+                console.error('WASM test failed:', error);
+            }
+        }
+        
+        // Start test when page loads
+        window.addEventListener('load', testWASM);
+    </script>
+</body>
+</html>

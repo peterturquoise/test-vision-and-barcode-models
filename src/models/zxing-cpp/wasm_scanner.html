@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZXing-CPP WASM Barcode Scanner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .control-group {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .control-group h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .file-input-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .camera-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .camera-button {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .camera-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .camera-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .pattern-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .pattern-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .video-container {
+            position: relative;
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 5px solid #28a745;
+        }
+
+        .result-card.error {
+            border-left-color: #dc3545;
+        }
+
+        .result-card.warning {
+            border-left-color: #ffc107;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .barcode-value {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #495057;
+            font-family: 'Courier New', monospace;
+        }
+
+        .barcode-type {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .barcode-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .pattern-match {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .error-info {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 20px;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 ZXing-CPP WASM Scanner</h1>
+            <p>High-performance barcode detection powered by WebAssembly</p>
+        </div>
+
+        <div class="main-content">
+            <div class="controls">
+                <div class="control-group">
+                    <h3>📁 Upload Image</h3>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="fileInput" class="file-input" accept="image/*">
+                        <div class="file-input-button">
+                            📷 Choose Image File
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>📱 Camera Scanner</h3>
+                    <div class="camera-controls">
+                        <button id="startCamera" class="camera-button">🎥 Start Camera</button>
+                        <button id="captureAndScan" class="camera-button" disabled>📸 Capture & Scan</button>
+                        <button id="stopCamera" class="camera-button" disabled>⏹️ Stop Camera</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>🎯 Pattern Matching</h3>
+                    <input type="text" id="patternInput" class="pattern-input" placeholder="Enter pattern (e.g., 3232 for BPost)">
+                </div>
+            </div>
+
+            <div class="video-container" id="videoContainer">
+                <video id="video" autoplay playsinline></video>
+                <canvas class="canvas-overlay" id="overlayCanvas"></canvas>
+            </div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading ZXing-CPP WASM module...</p>
+            </div>
+
+            <div id="results" class="results"></div>
+
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalBarcodes">0</div>
+                    <div class="stat-label">Barcodes Found</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="processingTime">0ms</div>
+                    <div class="stat-label">Processing Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="patternMatches">0</div>
+                    <div class="stat-label">Pattern Matches</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load ZXing-CPP WASM using IIFE script (no CORS issues) -->
+    <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/iife/full/index.js"></script>
+    <script>
+        // Initialize WASM module using the global ZXingWASM
+        window.initZXingWASM = async function() {
+            try {
+                console.log('🔍 Checking ZXingWASM object...');
+                console.log('ZXingWASM:', typeof ZXingWASM);
+                
+                if (typeof ZXingWASM === 'undefined') {
+                    throw new Error('ZXingWASM object not found - script may not have loaded');
+                }
+                
+                console.log('🔍 ZXingWASM methods:', Object.keys(ZXingWASM));
+                
+                console.log('Loading ZXing-CPP WASM from zxing-wasm package...');
+                
+                // Use the global ZXingWASM object
+                window.zxingWasmModule = await ZXingWASM.prepareZXingModule({
+                    overrides: {
+                        locateFile: (path, prefix) => {
+                            if (path.endsWith('.wasm')) {
+                                return `https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/full/${path}`;
+                            }
+                            return prefix + path;
+                        }
+                    }
+                });
+                
+                console.log('🔍 ZXingWASM module prepared:', window.zxingWasmModule);
+                
+                // Make functions globally available
+                window.zxingWasmReadBarcodes = ZXingWASM.readBarcodes;
+                window.zxingWasmReadBarcodesFromImageData = ZXingWASM.readBarcodesFromImageData;
+                
+                console.log('🔍 Functions available:');
+                console.log('  readBarcodes:', typeof window.zxingWasmReadBarcodes);
+                console.log('  readBarcodesFromImageData:', typeof window.zxingWasmReadBarcodesFromImageData);
+                
+                console.log('✅ ZXing-CPP WASM loaded successfully!');
+                return window.zxingWasmModule;
+                
+            } catch (error) {
+                console.error('❌ WASM loading failed:', error);
+                console.error('Error details:', error.stack);
+                throw error;
+            }
+        };
+    </script>
+    
+    <script>
+        let zxing = null;
+        let video = null;
+        let canvas = null;
+        let ctx = null;
+        let overlayCanvas = null;
+        let overlayCtx = null;
+        let isScanning = false;
+        let animationId = null;
+
+        // Initialize ZXing-CPP WASM
+        async function initZXing() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                
+                // Load ZXing-CPP WASM module using working zxing-wasm package
+                zxing = await window.initZXingWASM();
+                console.log('ZXing-CPP WASM loaded successfully');
+                
+                document.getElementById('loading').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Failed to load ZXing-CPP WASM:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #dc3545; text-align: center;">
+                        <h3>❌ Failed to load ZXing-CPP WASM</h3>
+                        <p>Error: ${error.message}</p>
+                        <p>This is likely due to CORS/COEP restrictions.</p>
+                        <p>Try using the Docker version instead: <code>python3 web_server.py</code></p>
+                    </div>
+                `;
+            }
+        }
+
+        function setupEventListeners() {
+            // File input
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            
+            // Camera controls
+            document.getElementById('startCamera').addEventListener('click', startCamera);
+            document.getElementById('captureAndScan').addEventListener('click', captureAndScan);
+            document.getElementById('stopCamera').addEventListener('click', stopCamera);
+            
+            // Pattern input
+            document.getElementById('patternInput').addEventListener('input', function() {
+                if (isScanning) {
+                    // Re-scan current frame if camera is active
+                    scanCurrentFrame();
+                }
+            });
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Check if WASM is loaded
+            if (!window.zxingWasmReadBarcodes) {
+                showError('WASM module not loaded yet. Please wait for initialization to complete.');
+                return;
+            }
+
+            const startTime = performance.now();
+            
+            try {
+                console.log('Processing file:', file.name);
+                console.log('File size:', file.size, 'bytes');
+                console.log('File type:', file.type);
+                
+                // Convert file to ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                console.log('ArrayBuffer size:', arrayBuffer.byteLength, 'bytes');
+                
+                // Use parallel preprocessing approaches like Docker version
+                console.log('Using parallel preprocessing approaches...');
+                const results = await detectBarcodesWithPreprocessing(arrayBuffer);
+                
+                console.log('Raw WASM results:', results);
+                
+                const processingTime = performance.now() - startTime;
+                displayResults(results, processingTime);
+                
+            } catch (error) {
+                console.error('Error processing file:', error);
+                showError('Failed to process image: ' + error.message);
+            }
+        }
+
+        async function startCamera() {
+            // Check if WASM is loaded
+            if (!window.zxingWasmReadBarcodesFromImageData) {
+                showError('WASM module not loaded yet. Please wait for initialization to complete.');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                video.addEventListener('loadedmetadata', () => {
+                    const container = document.getElementById('videoContainer');
+                    container.style.display = 'block';
+                    
+                    // Setup overlay canvas
+                    overlayCanvas = document.getElementById('overlayCanvas');
+                    overlayCtx = overlayCanvas.getContext('2d');
+                    overlayCanvas.width = video.videoWidth;
+                    overlayCanvas.height = video.videoHeight;
+                    
+                    // Camera ready - don't auto-scan, wait for manual capture
+                    isScanning = false; // Changed to false - manual scanning only
+                document.getElementById('startCamera').disabled = true;
+                document.getElementById('captureAndScan').disabled = false;
+                document.getElementById('stopCamera').disabled = false;
+                    
+                    console.log('📷 Camera ready - use Capture & Scan button to scan');
+                });
+                
+            } catch (error) {
+                console.error('Camera access failed:', error);
+                showError('Failed to access camera: ' + error.message);
+            }
+        }
+
+        function stopCamera() {
+            isScanning = false;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            document.getElementById('videoContainer').style.display = 'none';
+            document.getElementById('startCamera').disabled = false;
+            document.getElementById('captureAndScan').disabled = true;
+            document.getElementById('stopCamera').disabled = true;
+            
+            // Clear overlay
+            if (overlayCtx) {
+                overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            }
+        }
+
+        async function captureAndScan() {
+            // Check if WASM is loaded
+            if (!window.zxingWasmReadBarcodesFromImageData) {
+                showError('WASM module not loaded yet. Please wait for initialization to complete.');
+                return;
+            }
+
+            // Check if camera is active
+            if (!video || !isScanning) {
+                showError('Camera is not active. Please start the camera first.');
+                return;
+            }
+
+            try {
+                console.log('Capturing and scanning current frame...');
+                
+                // Capture current frame and scan it
+                await scanCurrentFrame();
+                
+            } catch (error) {
+                console.error('Error capturing and scanning:', error);
+                showError('Failed to capture and scan: ' + error.message);
+            }
+        }
+
+        function scanFrame() {
+            if (!isScanning) return;
+            
+            scanCurrentFrame();
+            animationId = requestAnimationFrame(scanFrame);
+        }
+
+        async function scanCurrentFrame() {
+            if (!video || !window.zxingWasmReadBarcodesFromImageData) return;
+            
+            const startTime = performance.now();
+            
+            try {
+                // Create canvas to capture video frame
+                if (!canvas) {
+                    canvas = document.createElement('canvas');
+                    ctx = canvas.getContext('2d', { willReadFrequently: true });
+                }
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Use high-level API for barcode detection with enhanced settings
+                const results = await window.zxingWasmReadBarcodesFromImageData(imageData, {
+                    tryHarder: true,
+                    tryRotate: true,
+                    tryInvert: true,
+                    tryDownscale: true,
+                    tryDenoise: true,
+                    maxNumberOfSymbols: 50,
+                    returnErrors: true,
+                    formats: ['QR_CODE', 'CODE_128', 'CODE_39', 'CODE_93', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'DATA_MATRIX', 'PDF_417', 'AZTEC', 'DATA_BAR', 'DATA_BAR_EXPANDED', 'DATA_BAR_LIMITED', 'ITF', 'CODABAR', 'MAXI_CODE', 'MICRO_QR_CODE', 'RMQR_CODE']
+                });
+                
+                const processingTime = performance.now() - startTime;
+                
+                // Clear previous overlays
+                if (overlayCtx) {
+                    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                }
+                
+                // Display results
+                displayResults(results, processingTime);
+                
+                // Draw bounding boxes
+                drawBoundingBoxes(results);
+                
+            } catch (error) {
+                console.error('Error scanning frame:', error);
+            }
+        }
+
+        // Replicate exact Docker zxing approach with parallel preprocessing
+        async function detectBarcodesWithPreprocessing(arrayBuffer) {
+            console.log('🔍 Starting detectBarcodesWithPreprocessing...');
+            console.log('ArrayBuffer size:', arrayBuffer.byteLength);
+            
+            // Check if WASM functions are available
+            if (!window.zxingWasmReadBarcodesFromImageData) {
+                console.error('❌ zxingWasmReadBarcodesFromImageData not available!');
+                throw new Error('WASM module not loaded properly');
+            }
+            
+            // Start with simple approach first - just try the raw image
+            try {
+                console.log('🧪 Testing simple approach first...');
+                const imgData = await arrayBufferToImageData(arrayBuffer);
+                console.log('ImageData created:', imgData.width, 'x', imgData.height);
+                
+                const simpleResults = await window.zxingWasmReadBarcodesFromImageData(imgData, {
+                    tryHarder: true,
+                    maxNumberOfSymbols: 10,
+                    returnErrors: true
+                });
+                
+                console.log('Simple approach found:', simpleResults.length, 'barcodes');
+                console.log('Simple results:', simpleResults);
+                
+                if (simpleResults.length > 0) {
+                    console.log('✅ Simple approach found barcodes, but trying full preprocessing for more...');
+                    // Don't return early - continue to full preprocessing
+                }
+                
+            } catch (error) {
+                console.error('❌ Simple approach failed:', error);
+                throw error;
+            }
+            
+            // If simple approach works, try the full parallel approach
+            console.log('🚀 Trying full parallel preprocessing...');
+            
+            const approaches = [
+                { name: "Original", process: (imgData) => imgData },
+                { name: "Grayscale", process: (imgData) => convertToGrayscale(imgData) },
+                { name: "Higher Contrast", process: (imgData) => enhanceContrast(imgData) }
+            ];
+
+            const pattern = document.getElementById('patternInput').value.trim();
+
+            // Run approaches in parallel
+            const promises = approaches.map(async (approach) => {
+                try {
+                    console.log(`Running ${approach.name} approach...`);
+                    
+                    // Convert ArrayBuffer to ImageData
+                    const imgData = await arrayBufferToImageData(arrayBuffer);
+                    
+                    // Apply preprocessing
+                    const processedImgData = approach.process(imgData);
+                    
+                    // Detect barcodes with this approach
+                    const results = await window.zxingWasmReadBarcodesFromImageData(processedImgData, {
+                        tryHarder: true,
+                        tryRotate: true,
+                        tryInvert: true,
+                        tryDownscale: true,
+                        tryDenoise: true,
+                        maxNumberOfSymbols: 50,
+                        returnErrors: true,
+                        formats: ['QR_CODE', 'CODE_128', 'CODE_39', 'CODE_93', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'DATA_MATRIX', 'PDF_417', 'AZTEC', 'DATA_BAR', 'DATA_BAR_EXPANDED', 'DATA_BAR_LIMITED', 'ITF', 'CODABAR', 'MAXI_CODE', 'MICRO_QR_CODE', 'RMQR_CODE']
+                    });
+
+                    // Add approach info to results
+                    const resultsWithApproach = results.map(result => ({
+                        ...result,
+                        approach: approach.name
+                    }));
+
+                    console.log(`${approach.name} found ${results.length} barcodes`);
+                    
+                    // Early return if pattern match found
+                    if (pattern && results.some(r => r.text && r.text.includes(pattern))) {
+                        console.log(`Pattern match found in ${approach.name}!`);
+                        return resultsWithApproach;
+                    }
+
+                    return resultsWithApproach;
+                } catch (error) {
+                    console.error(`Error in ${approach.name}:`, error);
+                    return [];
+                }
+            });
+
+            const results = await Promise.all(promises);
+            
+            // Flatten and deduplicate results
+            const flattened = results.flat();
+            const deduplicated = deduplicateBarcodes(flattened);
+            
+            console.log(`Total barcodes found: ${flattened.length}, after deduplication: ${deduplicated.length}`);
+            
+            return deduplicated;
+        }
+
+        // Image preprocessing functions (simplified versions for browser)
+        function convertToGrayscale(imgData) {
+            const data = new Uint8ClampedArray(imgData.data);
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                data[i] = gray;     // R
+                data[i + 1] = gray; // G
+                data[i + 2] = gray; // B
+                // Alpha stays the same
+            }
+            return new ImageData(data, imgData.width, imgData.height);
+        }
+
+        function enhanceContrast(imgData) {
+            const data = new Uint8ClampedArray(imgData.data);
+            const factor = 1.5; // Contrast factor
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));     // R
+                data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * factor + 128)); // G
+                data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * factor + 128)); // B
+            }
+            return new ImageData(data, imgData.width, imgData.height);
+        }
+
+        function scaleImage(imgData, scale) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = Math.round(imgData.width * scale);
+            canvas.height = Math.round(imgData.height * scale);
+            
+            // Create temporary canvas with original image
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = imgData.width;
+            tempCanvas.height = imgData.height;
+            tempCtx.putImageData(imgData, 0, 0);
+            
+            // Scale the image
+            ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+            
+            return ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+
+        function applyThreshold(imgData) {
+            const data = new Uint8ClampedArray(imgData.data);
+            const threshold = 128;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                const binary = gray > threshold ? 255 : 0;
+                data[i] = binary;     // R
+                data[i + 1] = binary; // G
+                data[i + 2] = binary; // B
+            }
+            return new ImageData(data, imgData.width, imgData.height);
+        }
+
+        function applyCLAHE(imgData) {
+            // Simplified CLAHE - just enhance contrast locally
+            return enhanceContrast(imgData);
+        }
+
+        async function arrayBufferToImageData(arrayBuffer) {
+            return new Promise((resolve, reject) => {
+                const blob = new Blob([arrayBuffer]);
+                const img = new Image();
+                const url = URL.createObjectURL(blob);
+                
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    resolve(imageData);
+                };
+                
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Failed to load image'));
+                };
+                
+                img.src = url;
+            });
+        }
+
+        function deduplicateBarcodes(barcodes) {
+            const seen = new Set();
+            const deduplicated = [];
+            
+            for (const barcode of barcodes) {
+                const key = `${barcode.text}_${barcode.format}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    deduplicated.push(barcode);
+                }
+            }
+            
+            return deduplicated;
+        }
+
+        function displayResults(results, processingTime) {
+            const resultsDiv = document.getElementById('results');
+            const statsDiv = document.getElementById('stats');
+            
+            resultsDiv.innerHTML = '';
+            
+            // Debug: Log results to console
+            console.log('WASM Scanner Results:', results);
+            console.log('Number of barcodes found:', results ? results.length : 0);
+            
+            if (!results || results.length === 0) {
+                resultsDiv.innerHTML = '<div class="result-card warning"><h3>No barcodes found</h3><p>Try adjusting the image quality or lighting conditions.</p><p><small>Debug: Check browser console for details</small></p></div>';
+                statsDiv.style.display = 'none';
+                return;
+            }
+            
+            const pattern = document.getElementById('patternInput').value.trim();
+            let patternMatches = 0;
+            
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                const { format, text, error } = result;
+                
+                const isPatternMatch = pattern && text.includes(pattern);
+                if (isPatternMatch) patternMatches++;
+                
+                const resultCard = document.createElement('div');
+                resultCard.className = `result-card ${error ? 'error' : isPatternMatch ? '' : 'warning'}`;
+                
+                resultCard.innerHTML = `
+                    <div class="result-header">
+                        <div class="barcode-value">${escapeHtml(text || 'Error reading barcode')}</div>
+                        <div class="barcode-type">${format}</div>
+                    </div>
+                    
+                    <div class="barcode-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Confidence</div>
+                            <div class="detail-value">${error ? 'Low (Error)' : 'High'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Status</div>
+                            <div class="detail-value">${error ? 'Error' : 'Clean'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Format</div>
+                            <div class="detail-value">${format}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Found via</div>
+                            <div class="detail-value">${result.approach || 'Unknown'}</div>
+                        </div>
+                    </div>
+                    
+                    ${error ? `<div class="error-info">❌ Error: ${escapeHtml(error)}</div>` : ''}
+                    ${isPatternMatch ? `<div class="pattern-match">🎯 Pattern Match Found!</div>` : ''}
+                `;
+                
+                resultsDiv.appendChild(resultCard);
+            }
+            
+            // Update stats
+            document.getElementById('totalBarcodes').textContent = results.length;
+            document.getElementById('processingTime').textContent = Math.round(processingTime) + 'ms';
+            document.getElementById('patternMatches').textContent = patternMatches;
+            statsDiv.style.display = 'grid';
+        }
+
+        function drawBoundingBoxes(results) {
+            if (!overlayCtx || !results || results.length === 0) return;
+            
+            overlayCtx.strokeStyle = '#ff0000';
+            overlayCtx.lineWidth = 3;
+            overlayCtx.font = '16px Arial';
+            overlayCtx.fillStyle = '#ff0000';
+            
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                const position = result.position || result.cornerPoints || result.polygon;
+                
+                if (!position) continue;
+                
+                // Handle different position formats from zxing-wasm
+                let points = [];
+                if (position.topLeft && position.topRight && position.bottomRight && position.bottomLeft) {
+                    // Standard format
+                    points = [position.topLeft, position.topRight, position.bottomRight, position.bottomLeft];
+                } else if (Array.isArray(position) && position.length >= 4) {
+                    // Array format
+                    points = position.slice(0, 4);
+                } else {
+                    continue; // Skip if we can't determine the shape
+                }
+                
+                // Draw bounding box
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(points[0].x, points[0].y);
+                overlayCtx.lineTo(points[1].x, points[1].y);
+                overlayCtx.lineTo(points[2].x, points[2].y);
+                overlayCtx.lineTo(points[3].x, points[3].y);
+                overlayCtx.closePath();
+                overlayCtx.stroke();
+                
+                // Draw number in center
+                const centerX = (points[0].x + points[2].x) / 2;
+                const centerY = (points[0].y + points[2].y) / 2;
+                overlayCtx.fillText((i + 1).toString(), centerX, centerY);
+            }
+        }
+
+        function showError(message) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="result-card error"><h3>❌ Error</h3><p>${escapeHtml(message)}</p></div>`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners immediately
+            setupEventListeners();
+            // Then try to load WASM
+            initZXing();
+        });
+    </script>
+</body>
+</html>

@@ -120,3 +120,4 @@ After setup, you can test the integration by asking questions like:
 - "Show me zxing-cpp configuration options"
 
 The Context7 MCP server will automatically fetch the latest documentation.
+
