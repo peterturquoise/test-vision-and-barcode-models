@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: zxing-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - zxing-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ZXing Queue Worker
+  zxing-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.rabbitmq-worker
+    environment:
+      - WORKERS=4
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - /Users/peterbrooke/dev/cursor/test-7-vision-models/test_images:/app/test_images:ro
+    networks:
+      - zxing-network
+    restart: unless-stopped
+
+  # Test Client (runs once and exits)
+  test-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.rabbitmq-client
+    environment:
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - /Users/peterbrooke/dev/cursor/test-7-vision-models/test_images:/app/test_images:ro
+    command: ["/usr/local/bin/rabbitmq-client", "/app/test_images/Complete Labels/3_J18CBEP8CCN070812400095N.jpeg", "20s"]
+    networks:
+      - zxing-network
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  zxing-network:
+    driver: bridge

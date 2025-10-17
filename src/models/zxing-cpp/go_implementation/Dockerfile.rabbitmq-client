@@ -1,0 +1,44 @@
+# Stage 1: Build Go application
+FROM golang:1.20-alpine AS builder
+
+# Install git for go mod download
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# Copy Go module files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY rabbitmq_client.go rabbitmq_client_main.go queue_worker.go ./
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix netgo -ldflags '-w -s' -o rabbitmq-client rabbitmq_client_main.go rabbitmq_client.go queue_worker.go
+
+# Final stage - Alpine
+FROM alpine:latest
+
+# Install ca-certificates
+RUN apk --no-cache add ca-certificates
+
+# Create non-root user
+RUN adduser -D -s /bin/sh appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy the Go binary from builder stage
+COPY --from=builder /app/rabbitmq-client /usr/local/bin/rabbitmq-client
+
+# Change ownership to appuser
+RUN chown appuser:appuser /usr/local/bin/rabbitmq-client
+
+# Switch to non-root user
+USER appuser
+
+# Run the test client
+CMD ["/usr/local/bin/rabbitmq-client"]

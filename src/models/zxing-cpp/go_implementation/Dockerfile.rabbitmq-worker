@@ -1,0 +1,56 @@
+# Stage 1: Build ZXing-CPP (using zxing-cpp:latest as base)
+FROM zxing-cpp:latest AS zxing
+
+# Stage 2: Build Go application
+FROM golang:1.20-alpine AS builder
+
+# Install git and build dependencies
+RUN apk add --no-cache git build-base
+
+# Set working directory
+WORKDIR /app
+
+# Copy Go module files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY queue_worker.go rabbitmq_worker_main.go rabbitmq_client.go ./
+
+# Build the application (no CGO needed for built-in image processing)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix netgo -ldflags '-w -s' -o queue-worker queue_worker.go rabbitmq_worker_main.go rabbitmq_client.go
+
+# Final stage - Ubuntu with ZXing-C++
+FROM ubuntu:20.04
+
+# Install necessary runtime libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy ZXing-C++ binary and libraries from zxing stage
+COPY --from=zxing /usr/local/bin/ZXingReader /usr/local/bin/ZXingReader
+COPY --from=zxing /usr/local/lib/libZXing.so* /usr/local/lib/
+
+# Copy the Go binary from builder stage
+COPY --from=builder /app/queue-worker /usr/local/bin/queue-worker
+
+# Change ownership to appuser
+RUN chown appuser:appuser /usr/local/bin/queue-worker /usr/local/bin/ZXingReader
+
+# Set library path for ZXing
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Switch to non-root user
+USER appuser
+
+# Run the worker (runs indefinitely)
+CMD ["/usr/local/bin/queue-worker"]

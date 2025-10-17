@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # ZXing Queue Worker
+  zxing-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - WORKERS=4
+    volumes:
+      - ../../test_images:/app/test_images:ro
+    restart: unless-stopped
+    networks:
+      - zxing-network
+
+  # Test Client (runs once and exits)
+  test-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.testclient
+    volumes:
+      - ../../test_images:/app/test_images:ro
+    command: ["/usr/local/bin/test-client", "/app/test_images/Complete Labels/3_J18CBEP8CCN070812400095N.jpeg", "20s"]
+    depends_on:
+      - zxing-worker
+    networks:
+      - zxing-network
+
+networks:
+  zxing-network:
+    driver: bridge

@@ -1,0 +1,80 @@
+# Multi-stage build for Go ZXing implementation with real ZXing-CPP
+FROM ubuntu:22.04 AS zxing-builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libopencv-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libwebp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build ZXing-CPP
+WORKDIR /tmp
+RUN git clone https://github.com/nu-book/zxing-cpp.git
+WORKDIR /tmp/zxing-cpp
+RUN mkdir build && cd build && \
+    cmake -DBUILD_READERS=ON -DBUILD_EXAMPLES=ON .. && \
+    make -j$(nproc)
+
+# Go builder stage
+FROM golang:1.20-alpine AS go-builder
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# Copy Go module files
+COPY go.mod ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY main.go .
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+# Runtime stage
+FROM ubuntu:22.04
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libopencv-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libwebp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy ZXing binary from builder
+COPY --from=zxing-builder /tmp/zxing-cpp/build/ZXingReader /usr/local/bin/ZXingReader
+RUN chmod +x /usr/local/bin/ZXingReader
+
+# Create app directory
+WORKDIR /app
+
+# Copy binary from go-builder stage
+COPY --from=go-builder /app/main .
+
+# Expose port
+EXPOSE 8001
+
+# Set environment variables
+ENV WORKERS=4
+ENV PORT=8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# Run the application
+CMD ["./main"]

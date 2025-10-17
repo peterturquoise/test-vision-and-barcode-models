@@ -1,0 +1,54 @@
+# Multi-stage build: Ubuntu with ZXing-C++ from zxing-cpp image
+FROM golang:1.20-alpine AS builder
+
+# Install git for go mod download
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY queue_main.go queue_worker.go ./
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix netgo -ldflags '-w -s' -o queue-worker .
+
+# Final stage - Ubuntu with ZXing-C++ from zxing-cpp image
+FROM ubuntu:20.04
+
+# Install ca-certificates and wget for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy ZXing-C++ binary and libraries from zxing-cpp image
+COPY --from=zxing-cpp:latest /usr/local/bin/ZXingReader /usr/local/bin/ZXingReader
+COPY --from=zxing-cpp:latest /usr/local/lib/libZXing.so* /usr/local/lib/
+
+# Copy the Go binary from builder stage
+COPY --from=builder /app/queue-worker /usr/local/bin/queue-worker
+
+# Change ownership to appuser
+RUN chown appuser:appuser /usr/local/bin/queue-worker /usr/local/bin/ZXingReader
+
+# Set library path for ZXing
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Switch to non-root user
+USER appuser
+
+# Run the application with 20 second test by default
+CMD ["/usr/local/bin/queue-worker", "queue-test", "20s"]
