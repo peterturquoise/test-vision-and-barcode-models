@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - zxing-network
+
+  cpp-memory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpp-memory-worker
+    depends_on:
+      - rabbitmq
+    networks:
+      - zxing-network
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    restart: unless-stopped
+
+networks:
+  zxing-network:
+    driver: bridge
